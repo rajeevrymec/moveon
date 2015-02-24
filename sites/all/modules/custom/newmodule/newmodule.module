@@ -1,0 +1,113 @@
+<?php
+function newmodule_theme() {
+  $themes = array();
+  $themes['datalist'] = array(
+    'template' => 'templates/datalists',
+    'variables' => array(
+      'output' => NULL,
+    ),
+  );
+  return $themes;
+ }
+
+function newmodule_form_comment_node_article_form_alter(&$form,&$form_state){	
+//dpm($form);
+$form['author']['#weight'] = 1;
+}
+
+//drupal_process_states
+function newmodule_form_article_node_form_alter(&$form,&$form_state){
+$form['field_image']['#states']=array(
+	'visible' => array (
+	':input[name="menu[enabled]"]' => array(
+	'checked' => FALSE,
+	),
+	),
+	);
+
+	}
+
+function newmodule_menu() {
+	$items = array();
+	
+	$items['newmodulecheck'] = array(
+    'title' => 'new module',
+    'description' => 'scd',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('newmodule_form'),
+	'access arguments' => array('administer new module'),
+    'type' => MENU_NORMAL_ITEM,
+   );
+   $items['multiform'] = array(
+    'title' => 'new module',
+    'description' => 'scd',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('newmodule_multi_form'),
+	'access arguments' => array('administer new module'),
+    'type' => MENU_NORMAL_ITEM,
+   );
+   $items['image_list'] = array(
+    'title' => 'images list',
+    'description' => 'list of images',
+    'page callback' => 'newmodule_list_data',
+	'access arguments' => array('administer new module'),
+    'type' => MENU_NORMAL_ITEM,
+   );
+	return $items;
+} 
+function newmodule_multi_form()
+{
+$options['url']='';
+if (empty($options['url'])) {
+    $options['url'] = url($_GET['q'], array('absolute' => TRUE));  
+  }
+  echo $options['url']; exit;
+$vocabulary = taxonomy_vocabulary_machine_name_load('tags');
+$terms = taxonomy_get_tree($vocabulary->vid);
+//print_r($terms);
+}
+function newmodule_form() {
+	drupal_add_js(drupal_get_path('module', 'newmodule') .'/js/newmodule.js',array('scope'=>'footer'));
+	//$form['#attached']['js'] = array(drupal_get_path('module', 'enfcan_sharestory') . '/js/jqueryvalidate.js');
+	//$form['#attached']['js'] = array(drupal_get_path('module', 'newmodule') . '/js/newmodule.js');
+	drupal_add_js(array('values' => array('name' => 'Move on','city' => 'bengaluru')), 'setting');
+	/*drupal_add_js('jQuery(document).ready(function () { alert("Hello!"); });', array(
+  'type' => 'inline',
+  'scope' => 'footer',
+  'group' => JS_THEME,
+  'weight' => 5,
+));
+*/
+
+ $form['Title'] = array(
+		'#title'         => t('title'),
+		'#title_display' => 'invisible',
+		'#type'          => 'textfield',
+		'#required'      => TRUE,
+		'#attributes'    => array(
+			'id' => 'title2',
+		),
+	);
+	$form['custom_captcha'] = array(
+    '#type' => 'captcha',
+    '#captcha_type' => 'captcha/Foo_CAPTCHA',
+	'#attributes'    => array(
+			'id' => 'custom_captcha',
+		),
+	);
+	$form['preview'] = array(
+	'#type' =>'button', 
+	'#value' => t('hello'), 
+	'#weight' => 19,
+	'#attributes'    => array(
+			'id' => 'helloworldbutton',),
+	);
+return $form;
+	
+}
+
+function newmodule_list_data() {
+  $json_data= drupal_http_request('http://192.254.141.167/~fstech/pic.php');
+	$decoded_data=drupal_json_decode($json_data->data);
+	return theme('datalist',  array('data' => $decoded_data));
+}

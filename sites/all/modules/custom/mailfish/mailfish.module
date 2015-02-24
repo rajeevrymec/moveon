@@ -1,0 +1,320 @@
+<?php
+/**
+ * @file
+ * Collect email addresses from a form within a page or block.
+ */
+/**
+ * Implements hook_menu().
+ */
+function mailfish_menu() {
+  $items = array();
+  $items['node/%/subscribe'] = array(
+    'title' => 'Subscribe',
+    'description' => 'Subscribe to this node',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('mailfish_email_form', 1),
+    'access callback' => 'mailfish_access_subscribe_tab',
+    'access arguments' => array('create mailfish subscriptions', 1),
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/config/content/mailfish'] = array(
+    'title' => 'Mailfish Settings',
+    'description' => 'Administer Mailfish Settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('mailfish_admin_settings_form'),
+    'access arguments' => array('administer mailfish settings'),
+    'file' => 'mailfish.admin.inc',
+  );
+  $items['admin/reports/mailfish'] = array(
+    'title' => 'Mailfish Signups',
+    'description' => 'View Mailfish Signups',
+    'page callback' => 'mailfish_signups',
+    'access arguments' => array('view mailfish subscriptions'),
+    'file' => 'mailfish.admin.inc',
+  );
+  return $items;
+}
+
+/**
+ * Provide the form to add an email address.
+ */
+function mailfish_email_form($form, $form_state, $nid = 0) {
+  global $user;
+  $form['email'] = array(
+    '#title' => t('Email address'),
+    '#type' => 'textfield',
+    '#size' => 20,
+    '#description' => t('Join our mailing list'),
+    '#required' => TRUE,
+    '#default_value' => isset($user->mail) ? $user->mail : '',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Sign Up'),
+  );
+  $form['nid'] = array(
+    '#type' => 'hidden',
+    '#value' => $nid,
+  );
+  return $form;
+}
+
+/**
+ * Validation handler for mailfish_email_form.
+ */
+function mailfish_email_form_validate($form, &$form_state) {
+
+  $email = $form_state['values']['email'];
+  if (!valid_email_address($email)) {
+    $message = t('The address %email is not a valid email address. Please 
+re-enter your address.', array('%email' => $email));
+    form_set_error('email', $message);
+  }
+
+  $nid = $form_state['values']['nid'];
+  if (!mailfish_get_node_enabled($nid)) {
+    form_set_error('', t('Mailfish subscriptions are not available for this 
+node.'));
+  }
+
+  // Do not allow multiple signups for the same node and email address.
+  $previous_signup = db_query("SELECT mail FROM {mailfish} WHERE nid = :nid AND 
+mail = :mail", array('nid' => $nid, 'mail' => $email))->fetchField();
+  if ($previous_signup) {
+    form_set_error('email', t('The address %email is already subscribed to this 
+list.', array('%email' => $email)));
+  }
+}
+
+/**
+ * Submission handler for mailfish_email_form.
+ */
+function mailfish_email_form_submit($form, &$form_state) {
+  // Get the title of the node  to use in the successful signup message.
+  $nid = isset($form_state['values']['nid']) ? $form_state['values']['nid'] : 0;
+  if ($nid && is_numeric($nid)) { 
+    // Signup the user.
+    mailfish_signup($form_state['values']['email'], $nid);
+
+    // Provide the user with a translated confirmation message.
+    drupal_set_message(t('Thank you for joining the mailing list. You 
+have been added as %email.', array('%email' => $form_state['values']['email'])));
+  }
+}
+
+/**
+ * Store a mailfish email signup.
+ */
+function mailfish_signup($email, $nid) {
+  global $user;
+
+  $value = array(
+    'nid' => $nid,
+    'uid' => $user->uid,
+    'mail' => $email,
+    'created' => time(),
+  );  
+
+  drupal_write_record('mailfish', $value);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function mailfish_permission() {
+  $perm = array(
+    'view mailfish subscriptions' => array(
+      'title' => t('View Mailfish subscriptions'),
+    ),  
+    'create mailfish subscriptions' => array(
+      'title' => t('Create Mailfish subscriptions'),
+    ),  
+    'administer mailfish settings' => array(
+      'title' => t('Administer Mailfish settings'),
+    )   
+  );  
+  return $perm;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function mailfish_block_info() {
+  $blocks = array();
+  $blocks['mailfish_subscribe'] = array(
+    'info' => t('Mailfish Signup Form'),
+  );
+  return $blocks;
+} 
+
+/*
+ * Implements hook_block_view().
+ */
+function mailfish_block_view($delta) {
+  $block = array();
+  switch ($delta) {
+  case 'mailfish_subscribe':
+    if (arg(0) == 'node' && is_numeric(arg(1)) && mailfish_get_node_enabled(arg(1))) {
+      $nid = arg(1);
+      $form = drupal_get_form('mailfish_email_form', $nid);
+      $block = array(
+        'subject' => "Mailfish Subscription",
+        'content' => theme('mailfish_block', array('form' => drupal_render($form))),
+      );
+    } 
+    break;
+  }
+  return $block;
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function mailfish_theme() {
+  $theme = array();
+  $theme['mailfish_block'] = array(
+    'variables' => array(
+      'form' => '',
+    ),
+    'template' => 'mailfish-block',
+  );
+  return $theme;
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ *
+ * Adds a checkbox to allow email address collection per node for
+ * enabled content types.
+ */
+function mailfish_form_node_form_alter(&$form, $form_state) {
+  $node = $form['#node'];
+  // Perform our check to see if we should be performing an action as the very first 
+  // action.
+  $types = variable_get('mailfish_types', array());
+  // Check if this node type is enabled for mailfish
+  // and that the user has access to the per-node settings.
+  if (!empty($types[$node->type]) && user_access('administer mailfish settings')) {
+    // Add a new fieldset with a checkbox for per-node mailfish setting.
+    $form['mailfish'] = array(
+      '#title' => t('MailFish'),
+      '#type' => 'fieldset',
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+      '#group' => 'additional_settings',
+    );
+    $form['mailfish']['mailfish_enabled'] = array(
+      '#title' => t('Collect e-mail addresses for this node.'),
+      '#type' => 'checkbox',
+      '#default_value' => isset($node->mailfish_enabled) ? 
+$node->mailfish_enabled : FALSE,
+    );
+  }
+}
+
+/**
+ * Determine if a node is set to display an email address form.
+ *
+ * @param int $nid
+ *   The node id of the node in question.
+ *
+ * @return boolean
+ */
+function mailfish_get_node_enabled($nid) {
+  if (is_numeric($nid)) {
+    $result = db_query("SELECT nid FROM {mailfish_enabled} WHERE nid = :nid", 
+array('nid' => $nid))->fetchField();
+    if ($result) {
+      return TRUE;
+    }   
+  }
+  return FALSE;
+}
+
+/**
+ * Add an entry for a node's mailfish setting.
+ *
+ * @param int $nid
+ *   The node id of the node in question.
+ */
+function mailfish_set_node_enabled($nid) {
+  if (is_numeric($nid) &! mailfish_get_node_enabled($nid)) {
+      db_insert('mailfish_enabled')
+        ->fields(array('nid' => $nid))
+        ->execute();
+  }
+}
+
+/**
+ * Remove an entry for a node's mailfish setting.
+ *
+ * @param int $nid
+ *   The node id of the node in question.
+ */
+function mailfish_delete_node_enabled($nid) {
+  if (is_numeric($nid)) {
+    db_delete('mailfish_enabled')
+      ->condition('nid', $nid)
+      ->execute();
+  }
+}
+
+/**
+ * Implements hook_node_load().
+ */
+function mailfish_node_load($nodes, $types) {
+  foreach ($nodes as $nid => $node) {
+    // Add mailfish data to the node object when it is loaded.
+    $node->mailfish_enabled = mailfish_get_node_enabled($node->nid);
+  }
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function mailfish_node_insert($node) {
+  if ($node->mailfish_enabled) {
+    // If Mailfish is enabled, store the record.
+    mailfish_set_node_enabled($node->nid);
+  }
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function mailfish_node_update($node) {
+  // Delete the old record, if one exists.
+  mailfish_delete_node_enabled($node->nid);
+  if ($node->mailfish_enabled) {
+    // If Mailfish is enabled, store the record.
+    mailfish_set_node_enabled($node->nid);
+  }
+}
+
+/**
+ * Implements hook_node_delete().
+ */
+function mailfish_node_delete($node) {
+  // Delete the mailfish_enabled record when the node is deleted.
+  mailfish_delete_node_enabled($node->nid);
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function mailfish_node_view($node, $view_mode, $langcode) {
+  // If appropriate, add the mailfish email form to the node's display.
+  if (!empty($node->mailfish_enabled) && user_access('create mailfish 
+subscription')) {
+    $node->content['mailfish'] = drupal_get_form('mailfish_email_form', $node->nid);
+    $node->content['mailfish']['#weight'] = 100;
+  }
+}
+
+/*
+ * Access callback for subscribe tab
+ */
+function mailfish_access_subscribe_tab($permission, $nid) {
+    return mailfish_get_node_enabled($nid) && user_access($permission);
+}

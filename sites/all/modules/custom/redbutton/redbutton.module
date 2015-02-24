@@ -1,0 +1,59 @@
+<?php
+/**
+ * @file
+ * Simple example module which adds a delete link to every article node.
+ */
+
+/**
+ * Implements hook_node_view().
+ * 
+ * This hook gets called everytime a node is being rendered.
+ * 
+ * The $node argument
+ * contains the node object. By modifying $node->content, one can alter how the
+ * node will be displayed.
+ * 
+ * The $view_mode argument
+ * is a string which describes how (or for what purpose) the node is being 
+displayed.
+ * Most common values are "rss" (in a feed), "teaser" (short form in a listing),
+ * and "full" (on its own page).
+ * 
+ * This function does not return anything, but modifies the node object.
+ */
+function redbutton_node_view($node, $view_mode) {
+  // Check the type of the node. We only want to show the link for articles.
+  if ($node->type == 'article') {
+    // The t() function is used to pass strings through Drupal's translation 
+engine.
+    $link_text = t('Delete this node');
+    // This is an array of options for the l() function (see below).
+    $link_options = array(
+      'attributes' => array('style' => 'color:#ff0000'),
+    );
+    // The l() function is used to generate HTML for a link (<a> tag).
+    // The first parameter is the text of the link.
+    // The second parameter is the href of the link.
+    // The third parameter is an array of options. There are lots of available 
+options
+    // see the documentation page http://api.drupal.org/api/drupal/includes--common.inc/function/l/7.
+    $link_markup = l($link_text, "node/$node->nid/delete", $link_options);
+    $node->content['redbutton'] = array();
+    $node->content['redbutton']['#markup'] = $link_markup;
+    
+    /**
+     * Note: The best practice for adding a link like this is below.
+     * However, it requires deeper Drupal theming knowledge and can be
+     * quite confusing for beginners.
+    $links['redbutton'] = array(
+      'title' => t("Delete this node."),
+      'href' => "node/$node->nid/delete",
+      'attributes' => array('style' => 'color:#ff0000'),
+    );
+    $node->content['links']['redbutton'] = array(
+      '#links' => $links,
+    );
+     * 
+     */
+  }
+}

@@ -1,0 +1,22 @@
+<?php 
+function foo_captcha_captcha($op, $captcha_type='') {
+  switch ($op) {
+   case 'generate':
+      if ($captcha_type == 'Foo_CAPTCHA') {
+        $captcha = array();
+        $captcha['solution'] = 'foo';
+        $captcha['form']['captcha_response'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Enter "foo"'),
+          '#required' => TRUE,
+        );
+        return $captcha;
+      }
+      break;
+  }
+}
+
+function foo_captcha_custom_validation($solution, $response) {
+  return $response == "foo" || $response == "bar";
+}
+

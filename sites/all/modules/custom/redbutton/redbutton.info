@@ -1,0 +1,5 @@
+name=Red Button
+project=custom
+version=1.x
+description = Red button try it
+core = 7.x

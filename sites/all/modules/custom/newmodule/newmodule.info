@@ -1,0 +1,4 @@
+name = new module
+description = hands on drupal
+package = other
+core = 7.x

@@ -1,0 +1,7 @@
+name=mailfish
+project=custom
+version=1.x
+description = Provides template, submission and validation functionality for the Canada sharestory form
+core = 7.x
+
+dependencies[]= block

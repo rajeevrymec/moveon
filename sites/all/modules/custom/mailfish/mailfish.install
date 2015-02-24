@@ -1,0 +1,96 @@
+<?php
+
+/******************************************************************************
+ * Exercise: Creating The mailfish.install File 
+ *****************************************************************************/
+
+/**
+ * @file
+ *   Defines and manages the Mailfish schema.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function mailfish_schema() {
+  $schema['mailfish'] = array(
+    'description' => 'Stores the email address, timestamp, node id and user id if any',
+    'fields' => array(
+      'id' => array(
+        'description' => 'The primary identifier for the entry.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that added this subscription.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'nid' => array(
+        'description' => 'The {node}.nid that this subscription was added on.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'mail' => array(
+        'description' => 'User\'s email address.',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'created' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Timestamp for when subscription was created.',
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'node' => array('nid'),
+      'node_user' => array('nid', 'uid'),
+    ),
+  );
+  $schema['mailfish_enabled'] = array(
+    'description' => 'Tracks whether Mailfish is enabled for a given node.',
+    'fields' => array(
+      'nid' => array(
+        'description' => 'The {node}.nid that has Mailfish enabled.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('nid'),
+  );
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function mailfish_uninstall() {
+  variable_del('mailfish_types');
+}
+
+/**
+ * Implements hook_update_N().
+ */
+function mailfish_update_7001() {
+  $mailfish_enabled_table = array(
+    'description' => 'Tracks whether Mailfish is enabled for a given node.',
+    'fields' => array(
+      'nid' => array(
+        'description' => 'The {node}.nid that has Mailfish enabled.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('nid'),
+  );
+  db_create_table('mailfish_enabled', $mailfish_enabled_table);
+}

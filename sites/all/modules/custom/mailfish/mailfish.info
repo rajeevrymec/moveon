@@ -1,0 +1,7 @@
+name=Mail fish
+project=custom
+version=1.x
+description = mail fish subscriptions  for node and view.
+core = 7.x
+
+dependencies[]= block

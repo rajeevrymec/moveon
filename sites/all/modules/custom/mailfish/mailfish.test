@@ -1,0 +1,50 @@
+<?php
+/**
+  * @file
+  *   Provide the automated tests for the Mailfish module.  
+  */
+
+class MailfishTestCase extends DrupalWebTestCase {
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Mailfish functionality',
+      'description' => 'Test the mailfish settings form functionality',
+      'group' => 'Mailfish',
+    );
+  }
+
+  /**
+   * Enable modules and create users with specific permissions.
+   */
+  function setUp() {
+    parent::setUp('mailfish');
+    // Create users.
+    $this->admin_user = $this->drupalCreateUser(array(
+      'administer mailfish settings',
+      'create page content',
+    ));
+  }
+
+  /**
+   * Test mailfish settings functionality.
+   */
+  function testMailfishSettings() {
+    // Log in an admin user.
+    $this->drupalLogin($this->admin_user);
+
+    // Check that no mailfish settings appear when adding a new page.
+    $this->drupalGet('node/add/page');
+    $this->assertNoText(t('Collect e-mail addresses for this node.'), 'The mailfish settings were not found.');
+
+    // Change the settings to enable mailfish on pages.
+    $edit = array('mailfish_types[page]' => TRUE);
+    
+    // $edit = array();
+    $this->drupalPost('admin/config/content/mailfish', $edit, t('Save configuration'));
+
+    // Check that the mailfish settings appear when adding a new page.
+    $this->drupalGet('node/add/page');
+    $this->assertText(t('Collect e-mail addresses for this node.'), 'The mailfish settings were not found.');
+  }
+}
